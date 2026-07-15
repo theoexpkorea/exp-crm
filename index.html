@@ -133,6 +133,12 @@
     color:var(--muted); background:var(--bg); border-radius:7px; padding:4px 9px; margin-bottom:9px;
   }
   .date-chip svg{flex:none}
+  .note-chip{
+    display:flex; align-items:flex-start; gap:6px; font-size:12px; font-weight:500;
+    color:var(--muted); background:var(--bg); border-radius:9px; padding:8px 10px;
+    margin-bottom:10px; line-height:1.45;
+  }
+  .note-chip svg{flex:none; margin-top:1px}
   .card .memo{font-size:12.5px; color:var(--muted); line-height:1.5; white-space:pre-line; margin-bottom:10px;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
 
@@ -146,7 +152,7 @@
   .btn:active{opacity:.75}
   .btn svg{flex:none}
   .btn.gray-fill{background:var(--chip); border-color:var(--line)}
-  .btn.btn-done{background:var(--ok-bg); color:var(--ok); border-color:#CBEAD9}
+  .btn.btn-done{background:var(--ok); color:#fff; border-color:var(--ok)}
   .statusmenu{position:fixed; z-index:80; background:var(--surface); border:1px solid var(--line);
     border-radius:13px; box-shadow:0 12px 30px rgba(20,24,32,.16); overflow-y:auto; display:none;
     min-width:180px; max-width:calc(100vw - 32px); max-height:50vh; padding:6px}
@@ -229,6 +235,7 @@
     background:#15181E; color:#fff; padding:11px 18px; border-radius:12px;
     font-size:13px; font-weight:700; z-index:999; box-shadow:0 8px 24px rgba(0,0,0,.28);
     opacity:0; transition:opacity .2s ease, transform .2s ease; max-width:88vw; text-align:center;
+    pointer-events:none;
   }
 </style>
 </head>
@@ -516,9 +523,9 @@ function render(){
       const parts = [];
       if(d.bldg) parts.push(d.bldg);
       if(d.addr) parts.push(d.addr);
-      if(parts.length) noteHtml = `<div class="memo">${parts.join(' · ')}</div>`;
+      if(parts.length) noteHtml = `<div class="note-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>${parts.join(' · ')}</span></div>`;
     } else if(d.cat==="LEAD" && d.remark){
-      noteHtml = `<div class="memo">${d.remark}</div>`;
+      noteHtml = `<div class="note-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>${d.remark}</span></div>`;
     }
     // 계약고객은 비고를 표시하지 않음
 
@@ -535,7 +542,7 @@ function render(){
 
     const initialPreview = estimateNext(d.cat, d.status);
 
-    const isDone = d0 !== null && d0 >= 1;
+    const isDone = d.lastContact === todayStr();
     const doneLabel = isDone ? "연락완료" : "연락예정";
     const doneClass = isDone ? "btn-done" : "gray-fill";
     const doneIcon = isDone
@@ -596,10 +603,17 @@ function openStatusMenu(key, cat){
     `<button data-v="${o}" class="${o===cur?'on':''}"><span>${o}</span>${o===cur?'<span>✓</span>':''}</button>`
   ).join("");
   const btn = document.getElementById("statusTrig_"+key).getBoundingClientRect();
-  statusmenu.style.top = (btn.bottom+6)+"px";
   statusmenu.style.left = btn.left+"px";
   statusmenu.style.width = btn.width+"px";
   statusmenu.classList.add("on");
+  const menuH = statusmenu.offsetHeight;
+  const spaceBelow = window.innerHeight - btn.bottom;
+  let top = btn.bottom + 6;
+  if(spaceBelow < menuH + 16 && btn.top - menuH - 6 > 8){
+    top = btn.top - menuH - 6;
+  }
+  top = Math.max(8, Math.min(top, window.innerHeight - menuH - 8));
+  statusmenu.style.top = top+"px";
   statusmenu.dataset.key = key;
   statusmenu.dataset.cat = cat;
   document.getElementById("scrim").classList.add("on");
