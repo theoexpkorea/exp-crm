@@ -116,6 +116,12 @@
   .card.overdue{border-color:#F3C7C7}
   .card-top{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px}
   .card-top .tags{display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+  .icon-btn{
+    flex:none; width:26px; height:26px; border-radius:8px; border:0;
+    background:transparent; color:#B7BCC4; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; padding:0;
+  }
+  .icon-btn:active{opacity:.6; background:var(--chip); color:var(--muted)}
   .tag{font-size:11px; font-weight:800; padding:3px 8px; border-radius:7px; background:#F0F1F4; color:#3B414C}
   .tag.status{background:var(--accent-soft); color:var(--accent)}
   .tag.temp-hot{background:#FDECEC; color:#C0392B}
@@ -173,12 +179,19 @@
   .panel.show{display:block}
   .field{margin-bottom:10px}
   .field label{display:block; font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:5px}
-  .field select, .field textarea{
+  .field select, .field textarea, .field input[type=text], .field input[type=tel], .field input[type=date]{
     width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 11px;
     font-size:14px; font-family:inherit; color:var(--ink); outline:0; background:var(--bg);
+    -webkit-user-select:text; user-select:text;
   }
-  .field select:focus, .field textarea:focus{border-color:var(--accent); background:#fff}
+  .field select:focus, .field textarea:focus, .field input:focus{border-color:var(--accent); background:#fff}
   .field textarea{resize:none; min-height:56px; line-height:1.4}
+  .date-trigger{
+    width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 11px;
+    font-size:14px; font-family:inherit; color:var(--ink); background:var(--bg);
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  }
+  .date-trigger svg{flex:none; color:var(--muted)}
   .preview{
     font-size:12.5px; color:var(--muted); background:var(--bg); border-radius:10px;
     padding:9px 11px; margin-bottom:10px; line-height:1.4;
@@ -237,6 +250,24 @@
     opacity:0; transition:opacity .2s ease, transform .2s ease; max-width:88vw; text-align:center;
     pointer-events:none;
   }
+
+  /* CRM 등록 FAB */
+  .fab-add{
+    position:fixed; z-index:50; height:52px; padding:0 20px 0 16px; border:0; border-radius:999px;
+    background:var(--accent); color:#fff; box-shadow:0 10px 24px rgba(150,100,15,.4);
+    display:flex; align-items:center; gap:7px; cursor:grab; touch-action:none;
+    font-family:inherit; font-size:14px; font-weight:800; white-space:nowrap; transition:box-shadow .12s;
+  }
+  .fab-add:active{cursor:grabbing; box-shadow:0 4px 14px rgba(150,100,15,.4)}
+  .fab-add svg{flex:none}
+
+  /* CRM 등록 시트 탭 */
+  .addtabs{display:flex; background:var(--chip); border-radius:11px; padding:3px; gap:3px}
+  .addtab{
+    flex:1; height:38px; border:0; border-radius:9px; background:transparent; color:var(--muted);
+    font-size:13px; font-weight:800; cursor:pointer; font-family:inherit;
+  }
+  .addtab.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(20,24,32,.12)}
 </style>
 </head>
 <body>
@@ -292,6 +323,30 @@
     <button class="fapply" id="fApply">결과 보기</button>
   </div>
 </div>
+
+<div class="fsheet" id="addsheet">
+  <div class="fsheet-grip"></div>
+  <div class="fsheet-head">
+    <h2 id="addsheetTitle">CRM 등록</h2>
+    <button class="freset" id="addClose">닫기</button>
+  </div>
+  <div style="padding:12px 18px 0" id="addTabsWrap">
+    <div class="addtabs" id="addTabs">
+      <button type="button" class="addtab on" data-cat="SALE">매도임대</button>
+      <button type="button" class="addtab" data-cat="LEAD">가망고객</button>
+      <button type="button" class="addtab" data-cat="CONTRACT">계약고객</button>
+    </div>
+  </div>
+  <div class="fsheet-body" id="addsheetBody"></div>
+  <div class="fsheet-foot">
+    <button class="fapply" id="addSave">저장</button>
+  </div>
+</div>
+
+<button id="fabAdd" class="fab-add" type="button">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>
+  CRM 등록
+</button>
 
 <div class="statusmenu" id="statusmenu"></div>
 
@@ -460,7 +515,7 @@ function syncFilterBadge(){
 function openFilterSheet(){ buildFilterSheet(); fsheet.classList.add("on"); scrim.classList.add("on"); }
 function closeFilterSheet(){ fsheet.classList.remove("on"); scrim.classList.remove("on"); }
 document.getElementById("openFilters").addEventListener("click", openFilterSheet);
-scrim.addEventListener("click", closeFilterSheet);
+scrim.addEventListener("click", closeAllOverlays);
 document.getElementById("fApply").addEventListener("click", ()=>{ closeFilterSheet(); render(); });
 document.getElementById("fReset").addEventListener("click", ()=>{
   state.statusFilter.clear();
@@ -556,7 +611,12 @@ function render(){
           <span class="tag">${d.catLabel}</span>
           ${d.status ? `<span class="tag status ${statusTagClass}"${statusStyle}>${d.status}</span>` : ''}
         </div>
-        ${dDayBadge(d.nextContact)}
+        <div style="display:flex; align-items:center; gap:6px">
+          <button type="button" class="icon-btn" onclick="openEditSheet('${d.cat}',${d.row},'${key}')" aria-label="정보 수정">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          ${dDayBadge(d.nextContact)}
+        </div>
       </div>
       <div class="name" style="margin-bottom:7px">${nameHtml}</div>
       ${contactChip}
@@ -601,7 +661,7 @@ function updatePreview(key, cat){
 const statusmenu = document.getElementById("statusmenu");
 function openStatusMenu(key, cat){
   const opts = STATUS_OPTIONS[cat] || [];
-  const cur = STATUS_SEL[key];
+  const cur = key.indexOf("new_")===0 ? NEW_STATUS_SEL[cat] : STATUS_SEL[key];
   statusmenu.innerHTML = opts.map(o=>
     `<button data-v="${o}" class="${o===cur?'on':''}"><span>${o}</span>${o===cur?'<span>✓</span>':''}</button>`
   ).join("");
@@ -628,13 +688,292 @@ function closeStatusMenu(){
 statusmenu.addEventListener("click", e=>{
   const b = e.target.closest("button"); if(!b) return;
   const key = statusmenu.dataset.key, cat = statusmenu.dataset.cat;
-  STATUS_SEL[key] = b.dataset.v;
   const trigTxt = document.getElementById("statusTrigTxt_"+key);
   if(trigTxt) trigTxt.textContent = b.dataset.v;
-  updatePreview(key, cat);
+  if(key.indexOf("new_")===0){
+    NEW_STATUS_SEL[cat] = b.dataset.v;
+  } else {
+    STATUS_SEL[key] = b.dataset.v;
+    updatePreview(key, cat);
+  }
   closeStatusMenu();
 });
-document.getElementById("scrim").addEventListener("click", closeStatusMenu);
+document.getElementById("scrim").addEventListener("click", closeAllOverlays);
+
+/* ===================== CRM 등록 / 수정 (움직이는 + 버튼) ===================== */
+let NEW_STATUS_SEL = { SALE:"", LEAD:"", CONTRACT:"" };
+let addCat = "SALE";
+let editItemData = null; // null=등록모드, item객체=수정모드
+const addsheet = document.getElementById("addsheet");
+
+function fv(id){
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+function escAttr(s){
+  return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+}
+function escHtml(s){
+  return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function addFieldsHTML(cat){
+  const opts = STATUS_OPTIONS[cat] || [];
+  const item = editItemData;
+  if(item){
+    NEW_STATUS_SEL[cat] = item.status || (opts[0]||"");
+  } else if(!NEW_STATUS_SEL[cat] && opts.length){
+    NEW_STATUS_SEL[cat] = opts[0];
+  }
+  const statusKey = "new_"+cat;
+  const statusLabel = cat==="LEAD" ? "온도" : "상태";
+  const statusField = `
+    <div class="field">
+      <label>${statusLabel}</label>
+      <button type="button" class="date-trigger" id="statusTrig_${statusKey}" onclick="openStatusMenu('${statusKey}','${cat}')">
+        <span id="statusTrigTxt_${statusKey}">${NEW_STATUS_SEL[cat] || '선택'}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>`;
+  const today = todayStr();
+  const idVal     = item ? (item.id||"")       : "";
+  const nameVal   = item ? (item.name||"")     : "";
+  const telVal    = item ? (item.tel||"")      : "";
+  const baseVal   = item ? (item.baseDate||today) : today;
+  const name2Val  = item ? (item.name2||"")    : "";
+  const remarkVal = item ? (item.remark||"")   : "";
+
+  if(cat==="SALE"){
+    return `
+      <div class="field"><label>매물번호 (선택 · 매물뷰 연동용)</label><input type="text" id="new_id_SALE" value="${escAttr(idVal)}" placeholder="예: FS0002"></div>
+      <div class="field"><label>성명</label><input type="text" id="new_name_SALE" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
+      <div class="field"><label>연락처</label><input type="tel" id="new_tel_SALE" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
+      <div class="field"><label>접수일</label><input type="date" id="new_base_SALE" value="${baseVal}"></div>
+      ${statusField}`;
+  }
+  if(cat==="LEAD"){
+    return `
+      <div class="field"><label>고객번호</label><input type="text" id="new_id_LEAD" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호"></div>
+      <div class="field"><label>고객명2 (카드 제목으로 표시)</label><input type="text" id="new_name2_LEAD" value="${escAttr(name2Val)}" placeholder="카드에 표시될 이름"></div>
+      <div class="field"><label>성명</label><input type="text" id="new_name_LEAD" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
+      <div class="field"><label>연락처</label><input type="tel" id="new_tel_LEAD" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
+      <div class="field"><label>접수일</label><input type="date" id="new_base_LEAD" value="${baseVal}"></div>
+      ${statusField}
+      <div class="field"><label>비고</label><textarea id="new_remark_LEAD" placeholder="특이사항을 남겨보세요.">${escHtml(remarkVal)}</textarea></div>`;
+  }
+  return `
+    <div class="field"><label>고객번호</label><input type="text" id="new_id_CONTRACT" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호"></div>
+    <div class="field"><label>성명</label><input type="text" id="new_name_CONTRACT" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
+    <div class="field"><label>연락처</label><input type="tel" id="new_tel_CONTRACT" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
+    <div class="field"><label>계약일</label><input type="date" id="new_base_CONTRACT" value="${baseVal}"></div>
+    ${statusField}`;
+}
+
+function buildAddForm(){
+  document.getElementById("addsheetBody").innerHTML = addFieldsHTML(addCat);
+}
+function openAddSheet(){
+  editItemData = null;
+  addCat = "SALE";
+  document.getElementById("addsheetTitle").textContent = "CRM 등록";
+  document.getElementById("addTabsWrap").style.display = "";
+  document.querySelectorAll("#addTabs .addtab").forEach(b=>b.classList.toggle("on", b.dataset.cat===addCat));
+  buildAddForm();
+  addsheet.classList.add("on");
+  scrim.classList.add("on");
+}
+function openEditSheet(cat, row, key){
+  const item = ALL_ITEMS.find(x=>x.cat===cat && x.row===row);
+  if(!item){ showToast("항목을 찾을 수 없어요."); return; }
+  editItemData = item;
+  addCat = cat;
+  document.getElementById("addsheetTitle").textContent = "정보 수정";
+  document.getElementById("addTabsWrap").style.display = "none";
+  buildAddForm();
+  addsheet.classList.add("on");
+  scrim.classList.add("on");
+}
+function closeAddSheet(){
+  addsheet.classList.remove("on");
+}
+function closeAllOverlays(){
+  closeFilterSheet();
+  closeAddSheet();
+  closeStatusMenu();
+}
+document.getElementById("addTabs").addEventListener("click", e=>{
+  const b = e.target.closest(".addtab"); if(!b) return;
+  addCat = b.dataset.cat;
+  document.querySelectorAll("#addTabs .addtab").forEach(x=>x.classList.toggle("on", x===b));
+  buildAddForm();
+});
+document.getElementById("addClose").addEventListener("click", closeAllOverlays);
+
+async function createEntry(){
+  const cat = addCat;
+  const name = fv("new_name_"+cat);
+  if(!name){ showToast("성명을 입력해 주세요."); return; }
+  const tel = fv("new_tel_"+cat);
+  const base = fv("new_base_"+cat) || todayStr();
+  const status = NEW_STATUS_SEL[cat] || "";
+  const payload = { sheet:cat, name:name, tel:tel, baseDate:base, status:status };
+
+  if(cat==="SALE"){
+    payload.id = fv("new_id_SALE");
+  } else {
+    const idVal = fv("new_id_"+cat);
+    if(!idVal){ showToast("고객번호를 입력해 주세요."); return; }
+    payload.id = idVal;
+  }
+  if(cat==="LEAD"){ payload.name2 = fv("new_name2_LEAD"); payload.remark = fv("new_remark_LEAD"); }
+
+  const saveBtn = document.getElementById("addSave");
+  saveBtn.disabled = true; saveBtn.textContent = "저장 중...";
+
+  const qs = Object.keys(payload).map(k=>encodeURIComponent(k)+"="+encodeURIComponent(payload[k])).join("&");
+  const url = CONFIG.DATA_URL + "?mode=crmCreate&" + qs;
+
+  try{
+    const res = await jsonpRetry(url, 15000);
+    if(res && res.ok && res.item){
+      ALL_ITEMS.push(res.item);
+      try{ localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(ALL_ITEMS)); }catch(e){}
+      closeAllOverlays();
+      buildChips();
+      render();
+      showToast(CAT_LABEL[cat]+" 등록됐어요.");
+    } else if(res && res.error === "dup_id"){
+      showToast("이미 있는 고객번호(매물번호)예요. 확인해 주세요.");
+    } else {
+      showToast("등록에 실패했어요. 다시 시도해 주세요.");
+    }
+  }catch(e){
+    showToast("연결이 원활하지 않아요. 다시 시도해 주세요.");
+  }finally{
+    saveBtn.disabled = false; saveBtn.textContent = "저장";
+  }
+}
+
+async function updateEntry(){
+  const cat = editItemData.cat, row = editItemData.row, key = editItemData.key;
+  const name = fv("new_name_"+cat);
+  if(!name){ showToast("성명을 입력해 주세요."); return; }
+  const tel = fv("new_tel_"+cat);
+  const status = NEW_STATUS_SEL[cat] || "";
+  const idVal = fv("new_id_"+cat);
+  if(cat!=="SALE" && !idVal){ showToast("고객번호를 입력해 주세요."); return; }
+
+  const payload = { sheet:cat, row:row, name:name, tel:tel };
+  if(idVal) payload.id = idVal;
+  if(status) payload.status = status;
+  if(cat==="LEAD"){ payload.name2 = fv("new_name2_LEAD"); payload.remark = fv("new_remark_LEAD"); }
+
+  const saveBtn = document.getElementById("addSave");
+  saveBtn.disabled = true; saveBtn.textContent = "저장 중...";
+
+  const qs = Object.keys(payload).map(k=>encodeURIComponent(k)+"="+encodeURIComponent(payload[k])).join("&");
+  const url = CONFIG.DATA_URL + "?mode=crmUpdate&" + qs;
+
+  try{
+    const res = await jsonpRetry(url, 15000);
+    if(res && res.ok){
+      const item = ALL_ITEMS.find(x=>x.cat===cat && x.row===row);
+      if(item){
+        item.name = name;
+        item.tel = tel;
+        if(idVal) item.id = idVal;
+        if(status) item.status = status;
+        if(cat==="LEAD"){ item.name2 = payload.name2; item.remark = payload.remark; }
+        if(res.nextContact) item.nextContact = res.nextContact;
+      }
+      try{ localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(ALL_ITEMS)); }catch(e){}
+      closeAllOverlays();
+      buildChips();
+      render();
+      showToast("수정됐어요.");
+    } else {
+      showToast("수정에 실패했어요. 다시 시도해 주세요.");
+    }
+  }catch(e){
+    showToast("연결이 원활하지 않아요. 다시 시도해 주세요.");
+  }finally{
+    saveBtn.disabled = false; saveBtn.textContent = "저장";
+  }
+}
+
+document.getElementById("addSave").addEventListener("click", ()=>{
+  if(editItemData) updateEntry(); else createEntry();
+});
+
+/* ===================== 움직이는 CRM 등록 버튼 (드래그) ===================== */
+(function(){
+  const fab = document.getElementById("fabAdd");
+  const FAB_POS_KEY = "theo_crm_fab_pos";
+  const margin = 12;
+
+  function clamp(x, y){
+    const w = fab.offsetWidth, h = fab.offsetHeight;
+    const maxX = Math.max(margin, window.innerWidth - w - margin);
+    const maxY = Math.max(margin, window.innerHeight - h - margin);
+    return { x: Math.min(Math.max(x, margin), maxX), y: Math.min(Math.max(y, margin), maxY) };
+  }
+  function setPos(x, y){
+    fab.style.left = x+"px";
+    fab.style.top = y+"px";
+  }
+  function savePos(x, y){
+    try{ localStorage.setItem(FAB_POS_KEY, JSON.stringify({x:x,y:y})); }catch(e){}
+  }
+  function initPos(){
+    let pos = null;
+    try{
+      const raw = localStorage.getItem(FAB_POS_KEY);
+      if(raw) pos = JSON.parse(raw);
+    }catch(e){}
+    if(pos && typeof pos.x === "number" && typeof pos.y === "number"){
+      const c = clamp(pos.x, pos.y);
+      setPos(c.x, c.y);
+    } else {
+      const x = window.innerWidth - fab.offsetWidth - 20;
+      const y = window.innerHeight - fab.offsetHeight - 96;
+      const c = clamp(x, y);
+      setPos(c.x, c.y);
+    }
+  }
+
+  let dragging = false, moved = false, startX = 0, startY = 0, origX = 0, origY = 0;
+  fab.addEventListener("pointerdown", e=>{
+    dragging = true; moved = false;
+    startX = e.clientX; startY = e.clientY;
+    const rect = fab.getBoundingClientRect();
+    origX = rect.left; origY = rect.top;
+    fab.setPointerCapture(e.pointerId);
+  });
+  fab.addEventListener("pointermove", e=>{
+    if(!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    const c = clamp(origX + dx, origY + dy);
+    setPos(c.x, c.y);
+  });
+  function onUp(){
+    if(!dragging) return;
+    dragging = false;
+    const rect = fab.getBoundingClientRect();
+    savePos(rect.left, rect.top);
+    if(!moved) openAddSheet();
+  }
+  fab.addEventListener("pointerup", onUp);
+  fab.addEventListener("pointercancel", onUp);
+
+  window.addEventListener("resize", ()=>{
+    const rect = fab.getBoundingClientRect();
+    const c = clamp(rect.left, rect.top);
+    setPos(c.x, c.y);
+  });
+
+  initPos();
+})();
 
 async function saveContact(cat, row, key){
   const memoVal = document.getElementById("memo_"+key).value.trim();
