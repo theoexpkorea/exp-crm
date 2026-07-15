@@ -146,6 +146,16 @@
   .btn:active{opacity:.75}
   .btn svg{flex:none}
   .btn.gray-fill{background:var(--chip); border-color:var(--line)}
+  .btn.btn-done{background:var(--ok-bg); color:var(--ok); border-color:#CBEAD9}
+  .statusmenu{position:fixed; z-index:80; background:var(--surface); border:1px solid var(--line);
+    border-radius:13px; box-shadow:0 12px 30px rgba(20,24,32,.16); overflow-y:auto; display:none;
+    min-width:180px; max-width:calc(100vw - 32px); max-height:50vh; padding:6px}
+  .statusmenu.on{display:block}
+  .statusmenu button{display:flex; align-items:center; justify-content:space-between; width:100%;
+    background:0; border:0; border-radius:9px; padding:12px 12px; font-size:14.5px; font-weight:500; color:var(--ink);
+    cursor:pointer; text-align:left; font-family:inherit}
+  .statusmenu button:active{background:var(--bg)}
+  .statusmenu button.on{color:var(--accent); font-weight:700; background:var(--accent-soft)}
   .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
   .name-link{color:inherit; text-decoration:none; display:inline-flex; align-items:center; gap:5px}
   .name-link svg{color:var(--muted); flex:none}
@@ -247,7 +257,7 @@
   <div style="display:flex; gap:8px; margin-bottom:10px">
     <div class="search" style="flex:1; margin-bottom:0">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="q" type="text" placeholder="이름 · 주소 · 번호 · 연락처 검색">
+      <input id="q" type="text" placeholder="이름 · 주소 · 코드 · 연락처 검색">
     </div>
     <button class="filter-btn" id="openFilters">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
@@ -276,6 +286,8 @@
   </div>
 </div>
 
+<div class="statusmenu" id="statusmenu"></div>
+
 <div id="toast"></div>
 
 <script>
@@ -296,9 +308,11 @@ function estimateNext(cat, status){
   return addDays(todayStr(), NEXT_DAYS_DEFAULT[cat] || 20);
 }
 const CARD_SCANNER_URL = "https://theoexpkorea.github.io/card-scanner/";
+const EXP_MAEMUL_URL = "https://theoexpkorea.github.io/exp-maemul/";
 
 let ALL_ITEMS = [];
 let STATUS_OPTIONS = {};
+let STATUS_SEL = {};
 let state = { cat:"전체", q:"", todayOnly:false, statusFilter:new Set() };
 
 function tempClass(s){
@@ -306,6 +320,25 @@ function tempClass(s){
   if(s==="웜") return "temp-warm";
   if(s==="콜드") return "temp-cold";
   return "";
+}
+
+const SALE_STATUS_COLOR = {
+  "접수":{bg:"#E8F5E9",fg:"#1B5E20"}, "광고중":{bg:"#E3F2FD",fg:"#0D47A1"},
+  "광고보류":{bg:"#FFF8E1",fg:"#F57F17"}, "광고만료":{bg:"#FBE9E7",fg:"#BF360C"},
+  "계약완료":{bg:"#EDE7F6",fg:"#4527A0"}, "종료":{bg:"#F5F5F5",fg:"#9E9E9E"}
+};
+const LEAD_STATUS_COLOR = {
+  "핫":{bg:"#FDECEC",fg:"#C0392B"}, "웜":{bg:"#FBF1E2",fg:"#9A5B14"}, "콜드":{bg:"#EAF2FE",fg:"#1D5FBF"},
+  "계약완료":{bg:"#EDE7F6",fg:"#4527A0"}, "종료":{bg:"#F5F5F5",fg:"#9E9E9E"}
+};
+const CONTRACT_STATUS_COLOR = {
+  "사후관리":{bg:"#E3F2FD",fg:"#0D47A1"}, "재계약예정":{bg:"#FFF8E1",fg:"#F57F17"},
+  "재계약완료":{bg:"#EDE7F6",fg:"#4527A0"}, "종료":{bg:"#F5F5F5",fg:"#9E9E9E"}
+};
+const CAT_STATUS_COLOR = { SALE:SALE_STATUS_COLOR, LEAD:LEAD_STATUS_COLOR, CONTRACT:CONTRACT_STATUS_COLOR };
+function statusColor(cat, status){
+  const map = CAT_STATUS_COLOR[cat];
+  return (map && map[status]) ? map[status] : null;
 }
 
 /* ===================== JSONP 유틸 ===================== */
@@ -357,7 +390,7 @@ function buildChips(){
   const chips = document.getElementById("chips");
   const cats = ["전체", ...CAT_ORDER];
   const todayCount = ALL_ITEMS.filter(d=>{ const x=dDay(d.nextContact); return x!==null && x<=0; }).length;
-  let html = `<div class="chip today-toggle ${state.todayOnly?'on':''}" data-today="1">오늘 ${todayCount}건</div>`;
+  let html = `<div class="chip today-toggle ${state.todayOnly?'on':''}" data-today="1">Today ${todayCount}건</div>`;
   html += cats.map(c=>{
     const label = c==="전체" ? "전체" : CAT_LABEL[c];
     const on = state.cat===c ? "on" : "";
@@ -386,17 +419,27 @@ function buildFilterSheet(){
       <div class="fgroup">
         <div class="ft">${CAT_LABEL[cat]}</div>
         <div class="fopts" data-group="${cat}">
-          ${opts.map(o=>`<button class="fopt ${state.statusFilter.has(o)?'on':''}" data-v="${o}">${o}</button>`).join("")}
+          ${opts.map(o=>{
+            const sc = statusColor(cat, o);
+            const on = state.statusFilter.has(o);
+            const style = (on && sc) ? ` style="background:${sc.bg};color:${sc.fg};border-color:${sc.fg}"` : '';
+            return `<button class="fopt ${on?'on':''}" data-v="${o}"${style}>${o}</button>`;
+          }).join("")}
         </div>
       </div>`;
   }).join("");
   body.querySelectorAll(".fopts").forEach(group=>{
+    const cat = group.dataset.group;
     group.addEventListener("click", e=>{
       const b = e.target.closest(".fopt"); if(!b) return;
       const v = b.dataset.v;
       if(state.statusFilter.has(v)) state.statusFilter.delete(v);
       else state.statusFilter.add(v);
-      b.classList.toggle("on", state.statusFilter.has(v));
+      const on = state.statusFilter.has(v);
+      b.classList.toggle("on", on);
+      const sc = statusColor(cat, v);
+      if(on && sc){ b.style.background = sc.bg; b.style.color = sc.fg; b.style.borderColor = sc.fg; }
+      else { b.style.background = ""; b.style.color = ""; b.style.borderColor = ""; }
       syncFilterBadge();
     });
   });
@@ -456,43 +499,64 @@ function render(){
     else if(d.cat==="LEAD"){ titleText = d.name2 || d.name || "(이름없음)"; subText = d.id + (d.name2 ? " · "+d.name : ""); }
 
     const statusTagClass = d.cat==="LEAD" ? tempClass(d.status) : "";
+    const sc = statusColor(d.cat, d.status);
+    const statusStyle = sc ? ` style="background:${sc.bg};color:${sc.fg}"` : '';
+
     const linkIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7M8 7h9v9"/></svg>`;
-    const nameHtml = (d.cat==="SALE"||d.cat==="CONTRACT")
-      ? `<a class="name-link" href="${CARD_SCANNER_URL}?property=${encodeURIComponent(d.id)}" target="_blank">${titleText}${linkIcon}</a>`
-      : titleText;
+    let nameHtml = titleText;
+    if(d.cat==="SALE"){
+      nameHtml = `<a class="name-link" href="${EXP_MAEMUL_URL}?q=${encodeURIComponent(d.id)}" target="_blank">${titleText}${linkIcon}</a>`;
+    }
+
+    const telHtml = d.tel ? ` · <a href="tel:${d.tel}" style="color:var(--accent);font-weight:800;text-decoration:none">${d.tel}</a>` : '';
+    const contactChip = `<div class="date-chip tnum" style="margin-bottom:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${subText}${telHtml}</div>`;
 
     let noteHtml = '';
-    if(d.cat==="SALE" && d.addr) noteHtml = `<div class="memo">${d.addr}</div>`;
-    else if(d.cat==="LEAD" && d.remark) noteHtml = `<div class="memo">${d.remark}</div>`;
+    if(d.cat==="SALE"){
+      const parts = [];
+      if(d.bldg) parts.push(d.bldg);
+      if(d.addr) parts.push(d.addr);
+      if(parts.length) noteHtml = `<div class="memo">${parts.join(' · ')}</div>`;
+    } else if(d.cat==="LEAD" && d.remark){
+      noteHtml = `<div class="memo">${d.remark}</div>`;
+    }
     // 계약고객은 비고를 표시하지 않음
 
     const opts = STATUS_OPTIONS[d.cat] || null;
+    if(opts) STATUS_SEL[key] = d.status;
     const statusField = opts ? `
         <div class="field">
           <label>상태</label>
-          <select id="status_${key}" onchange="updatePreview('${key}','${d.cat}')">
-            ${opts.map(o=>`<option value="${o}" ${o===d.status?'selected':''}>${o}</option>`).join("")}
-          </select>
+          <button type="button" class="date-trigger" id="statusTrig_${key}" onclick="openStatusMenu('${key}','${d.cat}')">
+            <span id="statusTrigTxt_${key}">${d.status || '선택'}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
         </div>` : '';
 
     const initialPreview = estimateNext(d.cat, d.status);
+
+    const isDone = d0 !== null && d0 >= 1;
+    const doneLabel = isDone ? "연락완료" : "연락예정";
+    const doneClass = isDone ? "btn-done" : "gray-fill";
+    const doneIcon = isDone
+      ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>`
+      : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`;
 
     return `
     <div class="card ${overdueClass}" data-key="${key}">
       <div class="card-top">
         <div class="tags">
           <span class="tag">${d.catLabel}</span>
-          ${d.status ? `<span class="tag status ${statusTagClass}">${d.status}</span>` : ''}
+          ${d.status ? `<span class="tag status ${statusTagClass}"${statusStyle}>${d.status}</span>` : ''}
         </div>
         ${dDayBadge(d.nextContact)}
       </div>
-      <div class="name">${nameHtml}</div>
-      <div class="id tnum">${subText}${d.tel ? ' · '+d.tel : ''}</div>
-      <div class="date-chip tnum"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>다음연락 ${d.nextContact||'-'}</div>
+      <div class="name" style="margin-bottom:7px">${nameHtml}</div>
+      ${contactChip}
+      <div class="date-chip tnum"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>next ${d.nextContact||'-'}</div>
       ${noteHtml}
       <div class="row">
-        ${d.tel ? `<a class="btn" href="tel:${d.tel}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>전화</a>` : `<span class="btn" style="opacity:.4;pointer-events:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>전화</span>`}
-        <button class="btn gray-fill" onclick="togglePanel('${key}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>연락완료</button>
+        <button class="btn ${doneClass}" onclick="togglePanel('${key}')">${doneIcon}${doneLabel}</button>
       </div>
       <div class="panel" id="panel_${key}">
         ${statusField}
@@ -518,16 +582,46 @@ function togglePanel(key){
   if(willShow) p.classList.add("show");
 }
 function updatePreview(key, cat){
-  const sel = document.getElementById("status_"+key);
-  const val = estimateNext(cat, sel ? sel.value : "");
+  const val = estimateNext(cat, STATUS_SEL[key] || "");
   const el = document.getElementById("preview_"+key);
   if(el) el.innerHTML = `다음 연락일은 저장하면 <b>${val}</b>(으)로 자동 계산돼요.`;
 }
 
+/* ===================== 커스텀 상태 드롭다운 ===================== */
+const statusmenu = document.getElementById("statusmenu");
+function openStatusMenu(key, cat){
+  const opts = STATUS_OPTIONS[cat] || [];
+  const cur = STATUS_SEL[key];
+  statusmenu.innerHTML = opts.map(o=>
+    `<button data-v="${o}" class="${o===cur?'on':''}"><span>${o}</span>${o===cur?'<span>✓</span>':''}</button>`
+  ).join("");
+  const btn = document.getElementById("statusTrig_"+key).getBoundingClientRect();
+  statusmenu.style.top = (btn.bottom+6)+"px";
+  statusmenu.style.left = btn.left+"px";
+  statusmenu.style.width = btn.width+"px";
+  statusmenu.classList.add("on");
+  statusmenu.dataset.key = key;
+  statusmenu.dataset.cat = cat;
+  document.getElementById("scrim").classList.add("on");
+}
+function closeStatusMenu(){
+  statusmenu.classList.remove("on");
+  document.getElementById("scrim").classList.remove("on");
+}
+statusmenu.addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  const key = statusmenu.dataset.key, cat = statusmenu.dataset.cat;
+  STATUS_SEL[key] = b.dataset.v;
+  const trigTxt = document.getElementById("statusTrigTxt_"+key);
+  if(trigTxt) trigTxt.textContent = b.dataset.v;
+  updatePreview(key, cat);
+  closeStatusMenu();
+});
+document.getElementById("scrim").addEventListener("click", closeStatusMenu);
+
 async function saveContact(cat, row, key){
   const memoVal = document.getElementById("memo_"+key).value.trim();
-  const statusSel = document.getElementById("status_"+key);
-  const statusVal = statusSel ? statusSel.value : "";
+  const statusVal = STATUS_SEL[key] || "";
 
   const url = CONFIG.DATA_URL + "?mode=crmUpdate&sheet="+encodeURIComponent(cat)
     + "&row="+encodeURIComponent(row)
