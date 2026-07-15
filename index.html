@@ -62,9 +62,15 @@
 
   /* 헤더 */
   header{
-    position:fixed; top:0; left:0; right:0; z-index:30; background:var(--surface);
-    border-bottom:1px solid var(--line);
+    position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px;
+    z-index:30; background:var(--surface);
+    border-bottom:1px solid var(--line); border-left:1px solid var(--line); border-right:1px solid var(--line);
     padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;
+    box-sizing:border-box;
+  }
+  @media (min-width:481px){
+    body{background:var(--line-2)}
+    header{top:0}
   }
   .head-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px}
   .brand{display:flex; align-items:baseline; gap:8px}
@@ -89,7 +95,13 @@
 
   #headerSpacer{width:100%}
 
-  main{padding:12px 12px calc(env(safe-area-inset-bottom) + 24px)}
+  main{
+    max-width:480px; margin:0 auto; box-sizing:border-box;
+    padding:12px 12px calc(env(safe-area-inset-bottom) + 24px);
+  }
+  @media (min-width:481px){
+    main{background:var(--bg); border-left:1px solid var(--line); border-right:1px solid var(--line); min-height:100vh}
+  }
 
   .card{
     background:var(--surface); border:1px solid var(--line); border-radius:14px;
@@ -160,7 +172,7 @@
 
 <div id="lockScreen">
   <div class="lock-logo">the<span class="o">o</span></div>
-  <div class="lock-sub">CRM 관리 · eXp Korea</div>
+  <div class="lock-sub">CRM</div>
   <div class="lock-box">
     <div class="lock-title">비밀번호를 입력하세요.</div>
     <input id="lockInput" class="lock-input" type="password" name="pin-code-not-a-password"
