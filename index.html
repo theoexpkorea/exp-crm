@@ -230,7 +230,7 @@
     border-bottom:1px solid var(--line); flex:none}
   .fsheet-head h2{font-size:16px; font-weight:800; margin:0}
   .fsheet-head .freset{font-size:13px; font-weight:700; color:var(--muted); background:0; border:0; cursor:pointer; font-family:inherit}
-  .fsheet-body{overflow-y:auto; padding:4px 18px 24px; flex:1 1 auto; min-height:0}
+  .fsheet-body{overflow-y:auto; padding:14px 18px 24px; flex:1 1 auto; min-height:0}
   .fgroup{padding:16px 0; border-bottom:1px solid var(--line-2)}
   .fgroup:last-child{border-bottom:0}
   .fgroup > .ft{font-size:13px; font-weight:800; margin-bottom:11px}
@@ -253,7 +253,7 @@
 
   /* CRM 등록 FAB */
   .fab-add{
-    position:fixed; z-index:50; height:52px; padding:0 20px 0 16px; border:0; border-radius:999px;
+    position:fixed; z-index:65; height:52px; padding:0 20px 0 16px; border:0; border-radius:999px;
     background:var(--accent); color:#fff; box-shadow:0 10px 24px rgba(150,100,15,.4);
     display:flex; align-items:center; gap:7px; cursor:grab; touch-action:none;
     font-family:inherit; font-size:14px; font-weight:800; white-space:nowrap; transition:box-shadow .12s;
@@ -268,6 +268,31 @@
     font-size:13px; font-weight:800; cursor:pointer; font-family:inherit;
   }
   .addtab.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(20,24,32,.12)}
+
+  /* 커스텀 달력 (파밍서치와 동일한 구조) */
+  .datecal{
+    position:fixed; left:50%; top:50%; transform:translate(-50%,-50%) scale(.96); z-index:85;
+    background:var(--surface); border-radius:20px; box-shadow:0 20px 50px rgba(20,24,32,.28);
+    width:320px; max-width:calc(100vw - 48px); padding:18px; display:none; opacity:0; transition:opacity .15s, transform .15s;
+  }
+  .datecal.on{display:block; opacity:1; transform:translate(-50%,-50%) scale(1)}
+  .datecal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px}
+  .datecal-title{font-size:15.5px; font-weight:800; color:var(--ink)}
+  .datecal-nav{
+    width:30px; height:30px; border-radius:9px; border:1px solid var(--line); background:var(--surface);
+    color:var(--ink); font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .datecal-nav:active{background:var(--chip)}
+  .datecal-week{display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:6px}
+  .datecal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px}
+  .dc-day{
+    height:38px; border:0; background:transparent; border-radius:11px; font-size:13.5px; font-weight:600;
+    color:var(--ink); cursor:pointer; font-family:inherit;
+  }
+  .dc-day:active{background:var(--chip)}
+  .dc-day.muted{color:#D5D8DD; cursor:default}
+  .dc-day.today{color:var(--accent); font-weight:800}
+  .dc-day.sel{background:var(--accent); color:#fff; font-weight:800}
 </style>
 </head>
 <body>
@@ -349,6 +374,16 @@
 </button>
 
 <div class="statusmenu" id="statusmenu"></div>
+
+<div class="datecal" id="datecal">
+  <div class="datecal-head">
+    <button type="button" class="datecal-nav" id="dcPrev">‹</button>
+    <div class="datecal-title" id="dcTitle">2026년 7월</div>
+    <button type="button" class="datecal-nav" id="dcNext">›</button>
+  </div>
+  <div class="datecal-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+  <div class="datecal-grid" id="dcGrid"></div>
+</div>
 
 <div id="toast"></div>
 
@@ -660,6 +695,7 @@ function updatePreview(key, cat){
 /* ===================== 커스텀 상태 드롭다운 ===================== */
 const statusmenu = document.getElementById("statusmenu");
 function openStatusMenu(key, cat){
+  closeDateCal();
   const opts = STATUS_OPTIONS[cat] || [];
   const cur = key.indexOf("new_")===0 ? NEW_STATUS_SEL[cat] : STATUS_SEL[key];
   statusmenu.innerHTML = opts.map(o=>
@@ -702,6 +738,7 @@ document.getElementById("scrim").addEventListener("click", closeAllOverlays);
 
 /* ===================== CRM 등록 / 수정 (움직이는 + 버튼) ===================== */
 let NEW_STATUS_SEL = { SALE:"", LEAD:"", CONTRACT:"" };
+let NEW_BASE_SEL = { SALE:"", LEAD:"", CONTRACT:"" };
 let addCat = "SALE";
 let editItemData = null; // null=등록모드, item객체=수정모드
 const addsheet = document.getElementById("addsheet");
@@ -739,16 +776,26 @@ function addFieldsHTML(cat){
   const idVal     = item ? (item.id||"")       : "";
   const nameVal   = item ? (item.name||"")     : "";
   const telVal    = item ? (item.tel||"")      : "";
-  const baseVal   = item ? (item.baseDate||today) : today;
   const name2Val  = item ? (item.name2||"")    : "";
   const remarkVal = item ? (item.remark||"")   : "";
+
+  NEW_BASE_SEL[cat] = item ? (item.baseDate || today) : (NEW_BASE_SEL[cat] || today);
+  const baseFieldLabel = cat==="CONTRACT" ? "계약일" : "접수일";
+  const baseField = `
+    <div class="field">
+      <label>${baseFieldLabel}</label>
+      <button type="button" class="date-trigger" id="baseTrig_${cat}" onclick="openDateCal('${cat}')">
+        <span id="baseTrigTxt_${cat}">${NEW_BASE_SEL[cat]}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+      </button>
+    </div>`;
 
   if(cat==="SALE"){
     return `
       <div class="field"><label>매물번호 (선택 · 매물뷰 연동용)</label><input type="text" id="new_id_SALE" value="${escAttr(idVal)}" placeholder="예: FS0002"></div>
       <div class="field"><label>성명</label><input type="text" id="new_name_SALE" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
       <div class="field"><label>연락처</label><input type="tel" id="new_tel_SALE" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
-      <div class="field"><label>접수일</label><input type="date" id="new_base_SALE" value="${baseVal}"></div>
+      ${baseField}
       ${statusField}`;
   }
   if(cat==="LEAD"){
@@ -757,7 +804,7 @@ function addFieldsHTML(cat){
       <div class="field"><label>고객명2 (카드 제목으로 표시)</label><input type="text" id="new_name2_LEAD" value="${escAttr(name2Val)}" placeholder="카드에 표시될 이름"></div>
       <div class="field"><label>성명</label><input type="text" id="new_name_LEAD" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
       <div class="field"><label>연락처</label><input type="tel" id="new_tel_LEAD" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
-      <div class="field"><label>접수일</label><input type="date" id="new_base_LEAD" value="${baseVal}"></div>
+      ${baseField}
       ${statusField}
       <div class="field"><label>비고</label><textarea id="new_remark_LEAD" placeholder="특이사항을 남겨보세요.">${escHtml(remarkVal)}</textarea></div>`;
   }
@@ -765,7 +812,7 @@ function addFieldsHTML(cat){
     <div class="field"><label>고객번호</label><input type="text" id="new_id_CONTRACT" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호"></div>
     <div class="field"><label>성명</label><input type="text" id="new_name_CONTRACT" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
     <div class="field"><label>연락처</label><input type="tel" id="new_tel_CONTRACT" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
-    <div class="field"><label>계약일</label><input type="date" id="new_base_CONTRACT" value="${baseVal}"></div>
+    ${baseField}
     ${statusField}`;
 }
 
@@ -775,6 +822,7 @@ function buildAddForm(){
 function openAddSheet(){
   editItemData = null;
   addCat = "SALE";
+  NEW_BASE_SEL = { SALE:"", LEAD:"", CONTRACT:"" };
   document.getElementById("addsheetTitle").textContent = "CRM 등록";
   document.getElementById("addTabsWrap").style.display = "";
   document.querySelectorAll("#addTabs .addtab").forEach(b=>b.classList.toggle("on", b.dataset.cat===addCat));
@@ -800,6 +848,7 @@ function closeAllOverlays(){
   closeFilterSheet();
   closeAddSheet();
   closeStatusMenu();
+  closeDateCal();
 }
 document.getElementById("addTabs").addEventListener("click", e=>{
   const b = e.target.closest(".addtab"); if(!b) return;
@@ -809,12 +858,83 @@ document.getElementById("addTabs").addEventListener("click", e=>{
 });
 document.getElementById("addClose").addEventListener("click", closeAllOverlays);
 
+/* ---- 커스텀 달력 (파밍서치와 동일한 구조) ---- */
+let dcCat = null;
+let dcViewYear = null, dcViewMonth = null;
+const datecal = document.getElementById("datecal");
+
+function openDateCal(cat){
+  closeStatusMenu();
+  dcCat = cat;
+  const cur = NEW_BASE_SEL[cat] || todayStr();
+  const d = new Date(cur+"T00:00:00");
+  dcViewYear = d.getFullYear();
+  dcViewMonth = d.getMonth();
+  renderDateCal();
+  datecal.classList.add("on");
+  scrim.classList.add("on");
+}
+function closeDateCal(){
+  datecal.classList.remove("on");
+}
+function renderDateCal(){
+  const first = new Date(dcViewYear, dcViewMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(dcViewYear, dcViewMonth+1, 0).getDate();
+  const prevDays = new Date(dcViewYear, dcViewMonth, 0).getDate();
+  document.getElementById("dcTitle").textContent = dcViewYear+"년 "+(dcViewMonth+1)+"월";
+  const selVal = NEW_BASE_SEL[dcCat] || "";
+  const tStr = todayStr();
+  let cells = [];
+  for(let i=startDow-1;i>=0;i--){ cells.push({d: prevDays-i, muted:true}); }
+  for(let d=1; d<=daysInMonth; d++){
+    const ds = dcViewYear+"-"+String(dcViewMonth+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+    cells.push({d:d, ds:ds, muted:false, sel: ds===selVal, today: ds===tStr});
+  }
+  let nextD = 1;
+  while(cells.length % 7 !== 0){ cells.push({d:nextD++, muted:true}); }
+  document.getElementById("dcGrid").innerHTML = cells.map(c=>{
+    if(c.muted) return `<span class="dc-day muted">${c.d}</span>`;
+    const cls = [c.sel?"sel":"", c.today?"today":""].filter(Boolean).join(" ");
+    return `<button type="button" class="dc-day ${cls}" data-ds="${c.ds}">${c.d}</button>`;
+  }).join("");
+}
+document.getElementById("dcPrev").addEventListener("click", ()=>{
+  dcViewMonth--; if(dcViewMonth<0){ dcViewMonth=11; dcViewYear--; }
+  renderDateCal();
+});
+document.getElementById("dcNext").addEventListener("click", ()=>{
+  dcViewMonth++; if(dcViewMonth>11){ dcViewMonth=0; dcViewYear++; }
+  renderDateCal();
+});
+document.getElementById("dcGrid").addEventListener("click", e=>{
+  const b = e.target.closest(".dc-day:not(.muted)"); if(!b) return;
+  const ds = b.dataset.ds;
+  NEW_BASE_SEL[dcCat] = ds;
+  const trigTxt = document.getElementById("baseTrigTxt_"+dcCat);
+  if(trigTxt) trigTxt.textContent = ds;
+  closeDateCal();
+});
+
+/* ---- 바깥 클릭하면 상태메뉴/달력이 확실히 닫히도록 ----
+   (등록/수정 시트가 열려있을 땐 스크림보다 시트가 위에 있어서
+   스크림 클릭만으로는 안 닫히던 문제 해결) */
+document.addEventListener("click", e=>{
+  if(statusmenu.classList.contains("on") && !e.target.closest("#statusmenu") && !e.target.closest(".date-trigger")){
+    closeStatusMenu();
+  }
+  if(datecal.classList.contains("on") && !e.target.closest("#datecal") && !e.target.closest(".date-trigger")){
+    closeDateCal();
+  }
+});
+
+
 async function createEntry(){
   const cat = addCat;
   const name = fv("new_name_"+cat);
   if(!name){ showToast("성명을 입력해 주세요."); return; }
   const tel = fv("new_tel_"+cat);
-  const base = fv("new_base_"+cat) || todayStr();
+  const base = NEW_BASE_SEL[cat] || todayStr();
   const status = NEW_STATUS_SEL[cat] || "";
   const payload = { sheet:cat, name:name, tel:tel, baseDate:base, status:status };
 
@@ -860,12 +980,14 @@ async function updateEntry(){
   if(!name){ showToast("성명을 입력해 주세요."); return; }
   const tel = fv("new_tel_"+cat);
   const status = NEW_STATUS_SEL[cat] || "";
+  const baseVal = NEW_BASE_SEL[cat] || "";
   const idVal = fv("new_id_"+cat);
   if(cat!=="SALE" && !idVal){ showToast("고객번호를 입력해 주세요."); return; }
 
   const payload = { sheet:cat, row:row, name:name, tel:tel };
   if(idVal) payload.id = idVal;
   if(status) payload.status = status;
+  if(baseVal) payload.baseDate = baseVal;
   if(cat==="LEAD"){ payload.name2 = fv("new_name2_LEAD"); payload.remark = fv("new_remark_LEAD"); }
 
   const saveBtn = document.getElementById("addSave");
@@ -883,6 +1005,7 @@ async function updateEntry(){
         item.tel = tel;
         if(idVal) item.id = idVal;
         if(status) item.status = status;
+        if(baseVal) item.baseDate = baseVal;
         if(cat==="LEAD"){ item.name2 = payload.name2; item.remark = payload.remark; }
         if(res.nextContact) item.nextContact = res.nextContact;
       }
