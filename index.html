@@ -11,11 +11,11 @@
 <meta name="theme-color" content="#3B1220">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CRM 관리">
+<meta name="apple-mobile-web-app-title" content="CRM">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="icon" type="image/png" href="./icon-192.png">
-<title>CRM 관리</title>
+<title>CRM</title>
 <style>
   :root{
     --bg:#F4F5F7; --surface:#FFFFFF; --ink:#15181E; --muted:#727A86;
@@ -256,7 +256,7 @@
 <header>
   <div class="head-row">
     <div class="brand">
-      <span class="logo">the<span class="o">o</span></span>
+      <span class="logo" onclick="event.preventDefault(); state.cat='전체'; state.q=''; state.todayOnly=false; state.statusFilter.clear(); document.getElementById('q').value=''; buildChips(); render();">the<span class="o">o</span></span>
       <span class="by">CRM 관리 · eXp Korea</span>
     </div>
     <div class="count"><b id="cnt">0</b>건</div>
@@ -573,7 +573,7 @@ function render(){
         <div class="preview" id="preview_${key}">다음 연락일은 저장하면 <b>${initialPreview}</b>(으)로 자동 계산돼요.</div>
         <div class="field">
           <label>메모 추가 (선택)</label>
-          <textarea id="memo_${key}" placeholder="통화 내용을 간단히 남겨보세요"></textarea>
+          <textarea id="memo_${key}" placeholder="통화 내용을 간단히 남겨보세요."></textarea>
         </div>
         <div class="row">
           <button class="btn" onclick="togglePanel('${key}')">취소</button>

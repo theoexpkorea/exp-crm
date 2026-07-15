@@ -1,6 +1,6 @@
 {
-  "name": "theo CRM 관리",
-  "short_name": "theo CRM",
+  "name": "CRM",
+  "short_name": "CRM",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#3B1220",
