@@ -294,16 +294,16 @@
   .dc-day.today{color:var(--accent); font-weight:800}
   .dc-day.sel{background:var(--accent); color:#fff; font-weight:800}
 
-  /* 정렬 드롭다운 (매물뷰와 동일한 스타일) */
-  .sortmenu{position:fixed; z-index:66; background:var(--surface); border:1px solid var(--line);
-    border-radius:13px; box-shadow:0 12px 30px rgba(20,24,32,.16); overflow-y:auto; display:none;
-    min-width:190px; max-width:calc(100vw - 32px); max-height:60vh; padding:6px}
-  .sortmenu.on{display:block}
-  .sortmenu button{display:flex; align-items:center; justify-content:space-between; width:100%;
-    background:0; border:0; border-radius:9px; padding:12px 12px; font-size:14.5px; font-weight:500; color:var(--ink);
-    cursor:pointer; text-align:left; font-family:inherit}
-  .sortmenu button:active{background:var(--bg)}
-  .sortmenu button.on{color:var(--accent); font-weight:700; background:var(--accent-soft)}
+  /* 정렬 바 */
+  .sortbar{display:flex; align-items:center; gap:6px; padding:10px 16px 2px; overflow-x:auto; max-width:480px; margin:0 auto; box-sizing:border-box; cursor:grab; user-select:none}
+  .sortbar-label{flex:none; font-size:11.5px; font-weight:800; color:var(--muted); margin-right:2px}
+  .sort-chip{
+    flex:none; height:30px; padding:0 12px; border-radius:999px; border:1px solid var(--line);
+    background:var(--surface); color:var(--muted); font-size:12.5px; font-weight:700; cursor:pointer;
+    display:flex; align-items:center; gap:3px; font-family:inherit;
+  }
+  .sort-chip.on{background:var(--accent); border-color:var(--accent); color:#fff}
+  .sort-chip .sc-arrow{font-size:11px}
 </style>
 </head>
 <body>
@@ -333,10 +333,6 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="q" type="text" placeholder="이름 · 주소 · 코드 · 연락처 검색">
     </div>
-    <button class="filter-btn" id="openSort">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
-      <span id="sortLabel">다음연락일 임박순</span>
-    </button>
     <button class="filter-btn" id="openFilters">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
       상태
@@ -346,6 +342,13 @@
   <div class="chips" id="chips"></div>
 </header>
 <div id="headerSpacer"></div>
+
+<div class="sortbar" id="sortbar">
+  <span class="sortbar-label">정렬</span>
+  <button type="button" class="sort-chip" data-key="id"><span class="sc-label">코드번호</span><span class="sc-arrow"></span></button>
+  <button type="button" class="sort-chip" data-key="lastContact"><span class="sc-label">마지막연락일</span><span class="sc-arrow"></span></button>
+  <button type="button" class="sort-chip" data-key="nextContact"><span class="sc-label">다음연락일</span><span class="sc-arrow"></span></button>
+</div>
 
 <main id="list">
   <div class="loading"><div class="sp"></div><div>불러오는 중...</div></div>
@@ -389,7 +392,6 @@
 </button>
 
 <div class="statusmenu" id="statusmenu"></div>
-<div class="sortmenu" id="sortmenu"></div>
 
 <div class="datecal" id="datecal">
   <div class="datecal-head">
@@ -575,48 +577,27 @@ document.getElementById("fReset").addEventListener("click", ()=>{
   render();
 });
 
-const SORTS = [
-  { k:"default",    label:"다음연락일 임박순" },
-  { k:"next_asc",    label:"다음연락일 빠른순" },
-  { k:"next_desc",   label:"다음연락일 늦은순" },
-  { k:"last_asc",    label:"마지막연락일 빠른순" },
-  { k:"last_desc",   label:"마지막연락일 늦은순" },
-  { k:"id_asc",      label:"코드번호 오름차순" },
-  { k:"id_desc",     label:"코드번호 내림차순" },
-];
-let sortState = "default";
+let sortKey = null; // null=기본(다음연락일 임박순), 'id'|'lastContact'|'nextContact'
+let sortDir = "asc";
 
-const sortmenu2 = document.getElementById("sortmenu");
-function renderSortMenu(){
-  sortmenu2.innerHTML = SORTS.map(s=>
-    `<button data-k="${s.k}" class="${s.k===sortState?'on':''}"><span>${s.label}</span>${s.k===sortState?'<span>✓</span>':''}</button>`
-  ).join("");
+function syncSortChips(){
+  document.querySelectorAll(".sort-chip").forEach(b=>{
+    const on = b.dataset.key === sortKey;
+    b.classList.toggle("on", on);
+    const arrow = b.querySelector(".sc-arrow");
+    if(arrow) arrow.textContent = on ? (sortDir==="asc" ? "↑" : "↓") : "";
+  });
 }
-renderSortMenu();
-function openSort(){
-  closeStatusMenu(); closeDateCal();
-  const btn = document.getElementById("openSort").getBoundingClientRect();
-  sortmenu2.style.top = (btn.bottom+6)+"px";
-  const rightOffset = window.innerWidth - btn.right;
-  sortmenu2.style.right = Math.max(rightOffset, 8)+"px";
-  sortmenu2.style.left = "auto";
-  sortmenu2.classList.add("on");
-  scrim.classList.add("on");
-}
-function closeSort(){
-  sortmenu2.classList.remove("on");
-  if(!fsheet.classList.contains("on") && !addsheet.classList.contains("on") &&
-     !statusmenu.classList.contains("on") && !datecal.classList.contains("on")){
-    scrim.classList.remove("on");
+document.getElementById("sortbar").addEventListener("click", e=>{
+  const b = e.target.closest(".sort-chip"); if(!b) return;
+  const key = b.dataset.key;
+  if(sortKey === key){
+    sortDir = sortDir === "asc" ? "desc" : "asc";
+  } else {
+    sortKey = key;
+    sortDir = "asc";
   }
-}
-document.getElementById("openSort").addEventListener("click", e=>{ e.stopPropagation(); openSort(); });
-sortmenu2.addEventListener("click", e=>{
-  const b = e.target.closest("button"); if(!b) return;
-  sortState = b.dataset.k;
-  document.getElementById("sortLabel").textContent = SORTS.find(s=>s.k===sortState).label;
-  renderSortMenu();
-  closeSort();
+  syncSortChips();
   render();
 });
 
@@ -633,9 +614,7 @@ function filtered(){
     return true;
   });
 
-  if(sortState !== "default"){
-    const [field, dir] = sortState.split("_");
-    const sortKey = field==="id" ? "id" : (field==="last" ? "lastContact" : "nextContact");
+  if(sortKey){
     return items.slice().sort((a,b)=>{
       const va = a[sortKey] || "", vb = b[sortKey] || "";
       if(!va && vb) return 1;
@@ -644,7 +623,7 @@ function filtered(){
       const cmp = sortKey==="id"
         ? va.localeCompare(vb, "ko", {numeric:true})
         : (new Date(va) - new Date(vb));
-      return dir==="asc" ? cmp : -cmp;
+      return sortDir==="asc" ? cmp : -cmp;
     });
   }
 
@@ -774,7 +753,6 @@ function updatePreview(key, cat){
 const statusmenu = document.getElementById("statusmenu");
 function openStatusMenu(key, cat){
   closeDateCal();
-  closeSort();
   const opts = STATUS_OPTIONS[cat] || [];
   const cur = key.indexOf("new_")===0 ? NEW_STATUS_SEL[cat] : STATUS_SEL[key];
   statusmenu.innerHTML = opts.map(o=>
@@ -933,7 +911,6 @@ function closeAllOverlays(){
   closeAddSheet();
   closeStatusMenu();
   closeDateCal();
-  closeSort();
 }
 document.getElementById("addTabs").addEventListener("click", e=>{
   const b = e.target.closest(".addtab"); if(!b) return;
@@ -950,7 +927,6 @@ const datecal = document.getElementById("datecal");
 
 function openDateCal(cat){
   closeStatusMenu();
-  closeSort();
   dcCat = cat;
   const cur = NEW_BASE_SEL[cat] || todayStr();
   const d = new Date(cur+"T00:00:00");
@@ -963,7 +939,7 @@ function openDateCal(cat){
 function closeDateCal(){
   datecal.classList.remove("on");
   if(!fsheet.classList.contains("on") && !addsheet.classList.contains("on") &&
-     !statusmenu.classList.contains("on") && !sortmenu2.classList.contains("on")){
+     !statusmenu.classList.contains("on")){
     scrim.classList.remove("on");
   }
 }
@@ -1015,9 +991,6 @@ document.addEventListener("click", e=>{
   }
   if(datecal.classList.contains("on") && !e.target.closest("#datecal") && !e.target.closest(".date-trigger")){
     closeDateCal();
-  }
-  if(sortmenu2.classList.contains("on") && !e.target.closest("#sortmenu") && !e.target.closest("#openSort")){
-    closeSort();
   }
 });
 
@@ -1374,6 +1347,7 @@ new MutationObserver(syncHeaderSpacer).observe(document.getElementById("chips"),
     }, true);
   }
   enableDragScroll(document.getElementById("chips"));
+  enableDragScroll(document.getElementById("sortbar"));
 })();
 
 </script>
