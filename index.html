@@ -679,6 +679,8 @@ function render(){
       if(parts.length) noteHtml = `<div class="note-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>${parts.join(' · ')}</span></div>`;
     } else if(d.cat==="LEAD" && d.remark){
       noteHtml = `<div class="note-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>${d.remark}</span></div>`;
+    } else if(d.cat==="CONTRACT" && d.remark){
+      noteHtml = `<div class="note-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>${d.remark}</span></div>`;
     }
     // 계약고객은 비고를 표시하지 않음
 
@@ -881,6 +883,7 @@ function addFieldsHTML(cat){
     <div class="field"><label>연락처</label><input type="tel" id="new_tel_CONTRACT" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
     ${baseField}
     ${statusField}
+    <div class="field"><label>비고</label><textarea id="new_remark_CONTRACT" placeholder="특이사항을 남겨보세요.">${escHtml(remarkVal)}</textarea></div>
     ${memoField}`;
 }
 
@@ -1034,6 +1037,7 @@ async function createEntry(){
     payload.id = idVal;
   }
   if(cat==="LEAD"){ payload.name2 = fv("new_name2_LEAD"); payload.remark = fv("new_remark_LEAD"); }
+  if(cat==="CONTRACT"){ payload.remark = fv("new_remark_CONTRACT"); }
   const memoVal = fv("new_memo_"+cat);
   if(memoVal) payload.memoSet = memoVal;
 
@@ -1079,6 +1083,7 @@ async function updateEntry(){
   if(status) payload.status = status;
   if(baseVal) payload.baseDate = baseVal;
   if(cat==="LEAD"){ payload.name2 = fv("new_name2_LEAD"); payload.remark = fv("new_remark_LEAD"); }
+  if(cat==="CONTRACT"){ payload.remark = fv("new_remark_CONTRACT"); }
   const memoVal = fv("new_memo_"+cat);
   payload.memoSet = memoVal;
 
@@ -1100,6 +1105,7 @@ async function updateEntry(){
         if(baseVal) item.baseDate = baseVal;
         item.memo = memoVal;
         if(cat==="LEAD"){ item.name2 = payload.name2; item.remark = payload.remark; }
+        if(cat==="CONTRACT"){ item.remark = payload.remark; }
         if(res.nextContact) item.nextContact = res.nextContact;
       }
       try{ localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(ALL_ITEMS)); }catch(e){}
