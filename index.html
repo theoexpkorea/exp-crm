@@ -1011,7 +1011,7 @@ document.addEventListener("click", e=>{
   if(statusmenu.classList.contains("on") && !e.target.closest("#statusmenu") && !e.target.closest(".date-trigger")){
     closeStatusMenu();
   }
-  if(datecal.classList.contains("on") && !e.target.closest("#datecal") && !e.target.closest(".date-trigger")){
+  if(datecal.classList.contains("on") && !e.target.closest("#datecal") && !e.target.closest(".date-trigger") && !e.target.closest(".date-chip-btn")){
     closeDateCal();
   }
 });
