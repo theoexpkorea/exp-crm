@@ -337,7 +337,7 @@
   <div style="display:flex; gap:8px; margin-bottom:10px">
     <div class="search" style="flex:1; margin-bottom:0">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="q" type="text" placeholder="이름 · 주소 · 코드 · 연락처 검색">
+      <input id="q" type="text" placeholder="이름 · 주소 · 코드 · 연락처 검색" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false">
     </div>
     <button class="filter-btn" id="openFilters">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
@@ -733,7 +733,7 @@ function render(){
         <div class="preview" id="preview_${key}">다음 연락일은 저장하면 <b>${initialPreview}</b>(으)로 자동 계산돼요.</div>
         <div class="field">
           <label>메모 추가 (선택)</label>
-          <textarea id="memo_${key}" placeholder="통화 내용을 간단히 남겨보세요."></textarea>
+          <textarea id="memo_${key}" name="x-c-memo-${key}" placeholder="통화 내용을 간단히 남겨보세요." autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></textarea>
         </div>
         <div class="row">
           <button class="btn" onclick="togglePanel('${key}')">취소</button>
@@ -855,35 +855,35 @@ function addFieldsHTML(cat){
       </button>
     </div>`;
   const memoVal = item ? (item.memo||"") : "";
-  const memoField = `<div class="field"><label>메모</label><textarea id="new_memo_${cat}" placeholder="통화·연락 메모">${escHtml(memoVal)}</textarea></div>`;
+  const memoField = `<div class="field"><label>메모</label><textarea id="new_memo_${cat}" name="x-memo-${cat}" placeholder="통화·연락 메모" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false">${escHtml(memoVal)}</textarea></div>`;
 
   if(cat==="SALE"){
     return `
-      <div class="field"><label>매물번호 (선택 · 매물뷰 연동용)</label><input type="text" id="new_id_SALE" value="${escAttr(idVal)}" placeholder="예: FS0002"></div>
-      <div class="field"><label>성명</label><input type="text" id="new_name_SALE" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
-      <div class="field"><label>연락처</label><input type="tel" id="new_tel_SALE" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
+      <div class="field"><label>매물번호 (선택 · 매물뷰 연동용)</label><input type="text" id="new_id_SALE" name="x-id-sale" value="${escAttr(idVal)}" placeholder="예: FS0002" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+      <div class="field"><label>성명</label><input type="text" id="new_name_SALE" name="x-nm-sale" value="${escAttr(nameVal)}" placeholder="고객 성명" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+      <div class="field"><label>연락처</label><input type="tel" id="new_tel_SALE" name="x-tel-sale" value="${escAttr(telVal)}" placeholder="010-0000-0000" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
       ${baseField}
       ${statusField}
       ${memoField}`;
   }
   if(cat==="LEAD"){
     return `
-      <div class="field"><label>고객번호</label><input type="text" id="new_id_LEAD" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호"></div>
-      <div class="field"><label>고객명2 (카드 제목으로 표시)</label><input type="text" id="new_name2_LEAD" value="${escAttr(name2Val)}" placeholder="카드에 표시될 이름"></div>
-      <div class="field"><label>성명</label><input type="text" id="new_name_LEAD" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
-      <div class="field"><label>연락처</label><input type="tel" id="new_tel_LEAD" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
+      <div class="field"><label>고객번호</label><input type="text" id="new_id_LEAD" name="x-id-lead" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+      <div class="field"><label>고객명2 (카드 제목으로 표시)</label><input type="text" id="new_name2_LEAD" name="x-nm2-lead" value="${escAttr(name2Val)}" placeholder="카드에 표시될 이름" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+      <div class="field"><label>성명</label><input type="text" id="new_name_LEAD" name="x-nm-lead" value="${escAttr(nameVal)}" placeholder="고객 성명" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+      <div class="field"><label>연락처</label><input type="tel" id="new_tel_LEAD" name="x-tel-lead" value="${escAttr(telVal)}" placeholder="010-0000-0000" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
       ${baseField}
       ${statusField}
-      <div class="field"><label>비고</label><textarea id="new_remark_LEAD" placeholder="특이사항을 남겨보세요.">${escHtml(remarkVal)}</textarea></div>
+      <div class="field"><label>비고</label><textarea id="new_remark_LEAD" name="x-rmk-lead" placeholder="특이사항을 남겨보세요." autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false">${escHtml(remarkVal)}</textarea></div>
       ${memoField}`;
   }
   return `
-    <div class="field"><label>고객번호</label><input type="text" id="new_id_CONTRACT" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호"></div>
-    <div class="field"><label>성명</label><input type="text" id="new_name_CONTRACT" value="${escAttr(nameVal)}" placeholder="고객 성명"></div>
-    <div class="field"><label>연락처</label><input type="tel" id="new_tel_CONTRACT" value="${escAttr(telVal)}" placeholder="010-0000-0000"></div>
+    <div class="field"><label>고객번호</label><input type="text" id="new_id_CONTRACT" name="x-id-ctr" value="${escAttr(idVal)}" placeholder="엑셀마스터 고객번호" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+    <div class="field"><label>성명</label><input type="text" id="new_name_CONTRACT" name="x-nm-ctr" value="${escAttr(nameVal)}" placeholder="고객 성명" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
+    <div class="field"><label>연락처</label><input type="tel" id="new_tel_CONTRACT" name="x-tel-ctr" value="${escAttr(telVal)}" placeholder="010-0000-0000" autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false"></div>
     ${baseField}
     ${statusField}
-    <div class="field"><label>비고</label><textarea id="new_remark_CONTRACT" placeholder="특이사항을 남겨보세요.">${escHtml(remarkVal)}</textarea></div>
+    <div class="field"><label>비고</label><textarea id="new_remark_CONTRACT" name="x-rmk-ctr" placeholder="특이사항을 남겨보세요." autocomplete="off" data-lpignore="true" data-form-type="other" autocorrect="off" spellcheck="false">${escHtml(remarkVal)}</textarea></div>
     ${memoField}`;
 }
 
