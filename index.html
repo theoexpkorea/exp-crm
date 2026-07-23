@@ -131,6 +131,7 @@
   .badge.overdue{background:var(--danger-bg); color:var(--danger)}
   .badge.today{background:var(--warn-bg); color:var(--warn)}
   .badge.upcoming{background:var(--ok-bg); color:var(--ok)}
+  .badge.done{background:var(--ok-bg); color:var(--ok)}
 
   .card .name{font-size:16px; font-weight:800; letter-spacing:-.01em; margin:0 0 2px}
   .card .id{font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:7px}
@@ -508,11 +509,21 @@ function dDayBadge(nextStr){
   return `<span class="badge upcoming">D-${d}</span>`;
 }
 
+/* ===== "당일 고정" 표시 로직 =====
+   오늘 연락완료 처리한 항목은 서버가 이미 실제 다음연락일(미래 날짜, 시트 수식 그대로)로
+   갱신해뒀지만, 화면(Today 뱃지/필터/카드 목록)에는 "오늘 하루 동안"은 계속 오늘 날짜에
+   고정해서 보여준다 — 엑셀마스터 CRM 이력을 이 화면 보고 정리하기 위함.
+   내일이 되면(todayStr()가 바뀌면) 이 조건이 자동으로 꺼지면서 실제 다음연락일 기준으로
+   저절로 되돌아간다 — 별도 저장/타이머 불필요. */
+function isDoneToday(it){ return it.lastContact === todayStr(); }
+function displayDate(it){ return isDoneToday(it) ? todayStr() : it.nextContact; }
+function displayDDay(it){ return dDay(displayDate(it)); }
+
 /* ===================== 렌더 ===================== */
 function buildChips(){
   const chips = document.getElementById("chips");
   const cats = ["전체", ...CAT_ORDER];
-  const todayCount = ALL_ITEMS.filter(d=>{ const x=dDay(d.nextContact); return x!==null && x<=0; }).length;
+  const todayCount = ALL_ITEMS.filter(d=>{ const x=displayDDay(d); return x!==null && x<=0; }).length;
   let html = `<div class="chip today-toggle ${state.todayOnly?'on':''}" data-today="1">Today ${todayCount}건</div>`;
   html += cats.map(c=>{
     const label = c==="전체" ? "전체" : CAT_LABEL[c];
@@ -613,7 +624,7 @@ function filtered(){
   const q = state.q.trim().toLowerCase();
   const items = ALL_ITEMS.filter(d=>{
     if(state.cat!=="전체" && d.cat!==state.cat) return false;
-    if(state.todayOnly){ const x=dDay(d.nextContact); if(x===null || x>0) return false; }
+    if(state.todayOnly){ const x=displayDDay(d); if(x===null || x>0) return false; }
     if(state.statusFilter.size && !state.statusFilter.has(d.status)) return false;
     if(q){
       const hay = (d.name+" "+(d.name2||"")+" "+(d.addr||"")+" "+(d.remark||"")+" "+d.id+" "+d.tel).toLowerCase();
@@ -636,8 +647,8 @@ function filtered(){
   }
 
   return items.sort((a,b)=>{
-    const da = a.nextContact ? new Date(a.nextContact) : new Date("2999-12-31");
-    const db = b.nextContact ? new Date(b.nextContact) : new Date("2999-12-31");
+    const da = displayDate(a) ? new Date(displayDate(a)) : new Date("2999-12-31");
+    const db = displayDate(b) ? new Date(displayDate(b)) : new Date("2999-12-31");
     return da - db;
   });
 }
@@ -651,7 +662,7 @@ function render(){
     return;
   }
   list.innerHTML = items.map(d=>{
-    const d0 = dDay(d.nextContact);
+    const d0 = displayDDay(d);
     const overdueClass = (d0!==null && d0<0) ? "overdue" : "";
     const key = d.cat+"_"+d.row;
 
@@ -699,7 +710,7 @@ function render(){
 
     const initialPreview = estimateNext(d.cat, d.status);
 
-    const isDone = d.lastContact === todayStr();
+    const isDone = isDoneToday(d);
     const doneLabel = isDone ? "연락완료" : "연락예정";
     const doneClass = isDone ? "btn-done" : "gray-fill";
     const doneIcon = isDone
@@ -717,7 +728,7 @@ function render(){
           <button type="button" class="icon-btn" onclick="openEditSheet('${d.cat}',${d.row},'${key}')" aria-label="정보 수정">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
-          ${dDayBadge(d.nextContact)}
+          ${isDone ? '<span class="badge done">오늘 처리완료</span>' : dDayBadge(d.nextContact)}
         </div>
       </div>
       <div class="name" style="margin-bottom:7px">${nameHtml}</div>
